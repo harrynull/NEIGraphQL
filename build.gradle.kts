@@ -11,6 +11,7 @@ plugins {
 
 group = "tech.harrynull"
 version = "0.0.1"
+
 application {
     mainClass.set("tech.harrynull.ApplicationKt")
 
@@ -30,16 +31,22 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:$logback_version")
     implementation("com.apurebase:kgraphql:$kgraphql_version")
     implementation("com.apurebase:kgraphql-ktor:$kgraphql_version")
+    implementation("com.zaxxer:HikariCP:5.0.1")
     implementation("app.cash.sqldelight:jdbc-driver:2.0.0-alpha05")
+    implementation("org.postgresql:postgresql:42.5.4")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }
 
 sqldelight {
     databases {
-        create("nei") {
+        create("NEIDatabase") {
             packageName.set("tech.harrynull")
-            dialect("app.cash.sqldeight:postgres-dialect:2.0.0-alpha05")
+            dialect("app.cash.sqldelight:postgresql-dialect:2.0.0-alpha05")
         }
     }
 }
+
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> { kotlinOptions.jvmTarget = "11" }
+
