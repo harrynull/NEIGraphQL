@@ -1,68 +1,56 @@
 package tech.harrynull
 
-import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.driver.jdbc.asJdbcDriver
 import com.apurebase.kgraphql.GraphQL
-import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import nei.ITEM
+import org.ktorm.database.Database
+import org.ktorm.dsl.*
+import org.ktorm.entity.*
+import tech.harrynull.orm.*
 import tech.harrynull.plugins.*
 
-val database = NEIDatabase(getSqlDriver())
+val database = Database.connect("jdbc:postgresql://127.0.0.1:5432/", user = "postgres", password = "root")
 
-data class ItemWithPosition(val position: Int, val item: ITEM)
+data class ItemWithPosition(val position: Int, val item: Item)
 
-data class OutputItem(val probability: Double, val item: ITEM, val stackSize: Int)
+data class OutputItem(val probability: Double, val item: Item, val stackSize: Int)
 
-data class Recipe(val id: String, val inputs: List<ItemWithPosition>, val outputs: List<OutputItem>) {
+data class Recipe(
+    val id: String,
+    val inputs: List<ItemWithPosition>,
+    val outputs: List<OutputItem>,
+    val recipeType: RecipeType,
+) {
     companion object {
         fun fromRecipeId(recipeId: String): Recipe {
+            val recipeType = database.from(RecipeRecipeType)
+                .select(RecipeRecipeType.recipeTypeId)
+                .where {RecipeRecipeType.id eq recipeId }
+                .limit(1)
+                .iterator().next()[RecipeRecipeType.recipeTypeId]!!
             return Recipe(
                 id = recipeId,
-                inputs = database.recipeQueries.findRecipeInputsByRecipeId(recipeId = recipeId, mapper = {
-                    ITEM_INPUTS_KEY, ID, IMAGE_FILE_PATH, INTERNAL_NAME,
-                    ITEM_DAMAGE, ITEM_ID, LOCALIZED_NAME, MAX_DAMAGE, MAX_STACK_SIZE, MOD_ID, NBT, TOOLTIP,
-                    UNLOCALIZED_NAME ->
-                    ItemWithPosition(ITEM_INPUTS_KEY, ITEM(
-                        ID = ID,
-                        IMAGE_FILE_PATH = IMAGE_FILE_PATH,
-                        INTERNAL_NAME = INTERNAL_NAME,
-                        ITEM_DAMAGE = ITEM_DAMAGE,
-                        ITEM_ID = ITEM_ID,
-                        LOCALIZED_NAME = LOCALIZED_NAME,
-                        MAX_DAMAGE = MAX_DAMAGE,
-                        MAX_STACK_SIZE = MAX_STACK_SIZE,
-                        MOD_ID = MOD_ID,
-                        NBT = NBT,
-                        TOOLTIP = TOOLTIP,
-                        UNLOCALIZED_NAME = UNLOCALIZED_NAME
-                    ))
-                }).executeAsList(),
-                outputs = database.recipeQueries.findRecipeOutputsByRecipeId(recipeId = recipeId, mapper = {
-                    ITEM_OUTPUTS_VALUE_PROBABILITY, ITEM_OUTPUTS_VALUE_STACK_SIZE, ID, IMAGE_FILE_PATH, INTERNAL_NAME,
-                    ITEM_DAMAGE, ITEM_ID, LOCALIZED_NAME, MAX_DAMAGE, MAX_STACK_SIZE, MOD_ID, NBT, TOOLTIP,
-                    UNLOCALIZED_NAME ->
-                    OutputItem(
-                        probability = ITEM_OUTPUTS_VALUE_PROBABILITY,
-                        item = ITEM(
-                            ID = ID,
-                            IMAGE_FILE_PATH = IMAGE_FILE_PATH,
-                            INTERNAL_NAME = INTERNAL_NAME,
-                            ITEM_DAMAGE = ITEM_DAMAGE,
-                            ITEM_ID = ITEM_ID,
-                            LOCALIZED_NAME = LOCALIZED_NAME,
-                            MAX_DAMAGE = MAX_DAMAGE,
-                            MAX_STACK_SIZE = MAX_STACK_SIZE,
-                            MOD_ID = MOD_ID,
-                            NBT = NBT,
-                            TOOLTIP = TOOLTIP,
-                            UNLOCALIZED_NAME = UNLOCALIZED_NAME
-                        ),
-                        stackSize = ITEM_OUTPUTS_VALUE_STACK_SIZE
-                    )
-                }).executeAsList()
+                inputs = database.from(RecipeItemGroup)
+                    .fullJoin(ItemGroupItemStacks, on = ItemGroupItemStacks.itemGroupId eq RecipeItemGroup.itemInputsId)
+                    .fullJoin(Items, on = Items.id eq ItemGroupItemStacks.itemStacksItemId)
+                    .select()
+                    .where { RecipeItemGroup.recipeId eq recipeId }
+                    .map { row ->
+                        ItemWithPosition(row[RecipeItemGroup.itemInputsKey]!!, Items.createEntity(row))
+                    },
+                outputs = database.from(RecipeItemOutputsItems)
+                    .fullJoin(Items, on = Items.id eq RecipeItemOutputsItems.itemOutputsValueItemId)
+                    .select()
+                    .where { RecipeItemOutputsItems.recipeId eq recipeId }
+                    .map { row ->
+                        OutputItem(
+                            row[RecipeItemOutputsItems.itemOutputsValueProbability]!!,
+                            Items.createEntity(row),
+                            row[RecipeItemOutputsItems.itemOutputsValueStackSize]!!
+                        )
+                    },
+                recipeType = database.sequenceOf(RecipeTypes).find { it.id eq recipeType }!!
             )
         }
     }
@@ -74,30 +62,34 @@ fun Application.module() {
         playground = true
         schema {
             query("items") {
-                resolver { limit: Long, nameQuery: String ->
-                    database.itemQueries.findItems(query = nameQuery, limit = limit).executeAsList()
+                resolver { limit: Int, nameQuery: String ->
+                    database.sequenceOf(Items)
+                        .filter { it.localizedName.toLowerCase() like nameQuery.lowercase() }
+                        .take(limit)
+                        .toList()
                 }
             }
-            type<ITEM> {
+            type<Item> {
                 description = "Minecraft Item"
-                property("asIngredient") {
-                    resolver { item: ITEM ->
-                        val recipeIds = database.recipeQueries.findRecipeIdsByOutputItemId(outputItemId = item.ID).executeAsList()
-                        recipeIds.map { Recipe.fromRecipeId(it) }
+                property("recipes") {
+                    resolver { item: Item ->
+                        database.from(RecipeItemOutputsItems)
+                            .select(RecipeItemOutputsItems.recipeId)
+                            .where { RecipeItemOutputsItems.itemOutputsValueItemId eq item.id }
+                            .map { Recipe.fromRecipeId(it[RecipeItemOutputsItems.recipeId]!!) }
                     }
                 }
+                Item::entityClass.ignore()
+                Item::properties.ignore()
+            }
+            type<RecipeType> {
+                RecipeType::entityClass.ignore()
+                RecipeType::properties.ignore()
             }
         }
     }
 }
-private fun getSqlDriver(): SqlDriver {
-    val ds = HikariDataSource()
-    ds.jdbcUrl = "jdbc:postgres://127.0.0.1:5432/public"
-    ds.dataSourceClassName = "org.postgresql.ds.PGSimpleDataSource"
-    ds.username = "postgres"
-    ds.password = "root"
-    return ds.asJdbcDriver()
-}
+
 fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
         .start(wait = true)

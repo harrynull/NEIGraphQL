@@ -6,7 +6,6 @@ val kgraphql_version: String by project
 plugins {
     kotlin("jvm") version "1.8.10"
     id("io.ktor.plugin") version "2.2.3"
-    id("app.cash.sqldelight") version "2.0.0-alpha05"
 }
 
 group = "tech.harrynull"
@@ -32,21 +31,12 @@ dependencies {
     implementation("com.apurebase:kgraphql:$kgraphql_version")
     implementation("com.apurebase:kgraphql-ktor:$kgraphql_version")
     implementation("com.zaxxer:HikariCP:5.0.1")
-    implementation("app.cash.sqldelight:jdbc-driver:2.0.0-alpha05")
     implementation("org.postgresql:postgresql:42.5.4")
+    implementation("org.ktorm:ktorm-core:3.6.0")
+    implementation("org.ktorm:ktorm-support-postgresql:3.6.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }
-
-sqldelight {
-    databases {
-        create("NEIDatabase") {
-            packageName.set("tech.harrynull")
-            dialect("app.cash.sqldelight:postgresql-dialect:2.0.0-alpha05")
-        }
-    }
-}
-
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> { kotlinOptions.jvmTarget = "11" }
 
