@@ -12,15 +12,18 @@ import tech.harrynull.plugins.*
 
 val database = Database.connect("jdbc:postgresql://127.0.0.1:5432/", user = "postgres", password = "root")
 
-data class ItemWithPosition(val position: Int, val item: Item)
+data class ItemStack(val item: Item, val stackSize: Int)
 
-data class OutputItem(val probability: Double, val item: Item, val stackSize: Int)
+data class InputItem(val key: Int, val itemStack: ItemStack)
+
+data class OutputItem(val key: Int, val probability: Double, val itemStack: ItemStack)
 
 data class Recipe(
     val id: String,
-    val inputs: List<ItemWithPosition>,
+    val inputs: List<InputItem>,
     val outputs: List<OutputItem>,
     val recipeType: RecipeType,
+    val gregTechRecipe: GregTechRecipe? = null,
 ) {
     companion object {
         fun fromRecipeId(recipeId: String): Recipe {
@@ -37,7 +40,10 @@ data class Recipe(
                     .select()
                     .where { RecipeItemGroup.recipeId eq recipeId }
                     .map { row ->
-                        ItemWithPosition(row[RecipeItemGroup.itemInputsKey]!!, Items.createEntity(row))
+                        InputItem(
+                            row[RecipeItemGroup.itemInputsKey]!!,
+                            ItemStack(Items.createEntity(row), row[ItemGroupItemStacks.itemStacksStackSize]!!)
+                        )
                     },
                 outputs = database.from(RecipeItemOutputsItems)
                     .fullJoin(Items, on = Items.id eq RecipeItemOutputsItems.itemOutputsValueItemId)
@@ -45,12 +51,13 @@ data class Recipe(
                     .where { RecipeItemOutputsItems.recipeId eq recipeId }
                     .map { row ->
                         OutputItem(
+                            row[RecipeItemOutputsItems.itemOutputsKey]!!,
                             row[RecipeItemOutputsItems.itemOutputsValueProbability]!!,
-                            Items.createEntity(row),
-                            row[RecipeItemOutputsItems.itemOutputsValueStackSize]!!
+                            ItemStack(Items.createEntity(row), row[RecipeItemOutputsItems.itemOutputsValueStackSize]!!)
                         )
                     },
-                recipeType = database.sequenceOf(RecipeTypes).find { it.id eq recipeType }!!
+                recipeType = database.sequenceOf(RecipeTypes).find { it.id eq recipeType }!!,
+                gregTechRecipe = database.sequenceOf(GregTechRecipes).find { it.recipeId eq recipeId },
             )
         }
     }
@@ -79,12 +86,24 @@ fun Application.module() {
                             .map { Recipe.fromRecipeId(it[RecipeItemOutputsItems.recipeId]!!) }
                     }
                 }
+                property("usages") {
+                    resolver { item: Item ->
+                        database.from(RecipeItemInputsItems)
+                            .select(RecipeItemInputsItems.recipeId)
+                            .where { RecipeItemInputsItems.itemInputsItemsId eq item.id }
+                            .map { Recipe.fromRecipeId(it[RecipeItemInputsItems.recipeId]!!) }
+                    }
+                }
                 Item::entityClass.ignore()
                 Item::properties.ignore()
             }
             type<RecipeType> {
                 RecipeType::entityClass.ignore()
                 RecipeType::properties.ignore()
+            }
+            type<GregTechRecipe> {
+                GregTechRecipe::entityClass.ignore()
+                GregTechRecipe::properties.ignore()
             }
         }
     }

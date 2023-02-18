@@ -65,6 +65,18 @@ object RecipeTypes : Table<RecipeType>("recipe_type") {
     val iconId = varchar("icon_id").bindTo { it.iconId }
 }
 
+object GregTechRecipes : Table<GregTechRecipe>("greg_tech_recipe") {
+    val id = varchar("id").primaryKey().bindTo { it.id }
+    val additionalInfo = varchar("additional_info").bindTo { it.additionalInfo }
+    val amperage = int("amperage").bindTo { it.amperage }
+    val duration = int("duration").bindTo { it.duration }
+    val requiresCleanroom = boolean("requires_cleanroom").bindTo { it.requiresCleanroom }
+    val requiresLowGravity = boolean("requires_low_gravity").bindTo { it.requiresLowGravity }
+    val voltage = int("voltage").bindTo { it.voltage }
+    val voltageTier = varchar("voltage_tier").bindTo { it.voltageTier }
+    val recipeId = varchar("recipe_id").bindTo { it.recipeId }
+}
+
 interface Item : Entity<Item> {
     companion object : Entity.Factory<Item>()
     val id: String
@@ -97,5 +109,18 @@ interface RecipeType : Entity<RecipeType> {
     val shapeless: Boolean
     val type: String
     val iconId: String
+}
+
+interface GregTechRecipe : Entity<GregTechRecipe> {
+    companion object : Entity.Factory<GregTechRecipe>()
+    val id: String
+    val additionalInfo: String
+    val amperage: Int
+    val duration: Int
+    val requiresCleanroom: Boolean
+    val requiresLowGravity: Boolean
+    val voltage: Int
+    val voltageTier: String
+    val recipeId: String
 }
 
