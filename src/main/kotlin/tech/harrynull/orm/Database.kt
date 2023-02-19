@@ -37,7 +37,7 @@ object Items : Table<Item>("item") {
     val id = varchar("id").primaryKey().bindTo { it.id }
     val imageFilePath = varchar("image_file_path").bindTo { it.imageFilePath }
     val internalName = varchar("internal_name").bindTo { it.internalName }
-    val item_damage = int("item_damage").bindTo { it.itemDamage }
+    val itemDamage = int("item_damage").bindTo { it.itemDamage }
     val itemId = int("item_id").bindTo { it.itemId }
     val localizedName = varchar("localized_name").bindTo { it.localizedName }
     val maxDamage = int("max_damage").bindTo { it.maxDamage }
