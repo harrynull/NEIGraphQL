@@ -34,6 +34,7 @@ dependencies {
     implementation("org.postgresql:postgresql:42.5.4")
     implementation("org.ktorm:ktorm-core:3.6.0")
     implementation("org.ktorm:ktorm-support-postgresql:3.6.0")
+    implementation("io.ktor:ktor-server-cors:$ktor_version")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }

@@ -62,9 +62,19 @@ data class Recipe(
 fun GraphQL.Configuration.buildSchema() {
     schema {
         query("items") {
-            resolver { limit: Int, nameQuery: String ->
+            resolver { limit: Int, nameQuery: String?, itemId: String? ->
                 database.sequenceOf(Items)
-                    .filter { it.localizedName.toLowerCase() like nameQuery.lowercase() }
+                    .let { items ->
+                        if (itemId != null) {
+                            items.filter { it.id eq itemId }
+                        } else items
+                    }
+                    .let { items ->
+                        if (nameQuery != null) {
+                            items.filter { it.localizedName.toLowerCase() like nameQuery.lowercase() }
+                        } else items
+                    }
+                    .sortedBy { it.itemId }
                     .take(limit)
                     .toList()
             }
@@ -91,6 +101,11 @@ fun GraphQL.Configuration.buildSchema() {
             Item::properties.ignore()
         }
         type<RecipeType> {
+            property("icon") {
+                resolver { recipeType: RecipeType ->
+                    database.sequenceOf(Items).find { it.id eq recipeType.iconId }!!
+                }
+            }
             RecipeType::entityClass.ignore()
             RecipeType::properties.ignore()
         }
