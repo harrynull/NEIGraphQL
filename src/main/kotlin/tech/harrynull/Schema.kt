@@ -147,7 +147,7 @@ fun GraphQL.Configuration.buildSchema() {
                     val results = database.sequenceOf(GregTechRecipes).filter { it.recipeId inList recipeIds }
                         .map { it.recipeId to it }
                         .toMap()
-                    recipeIds.map { id -> ExecutionResult.Success(results[id]!!) }
+                    recipeIds.map { id -> ExecutionResult.Success(results[id]) }
                 }
             }
         }

@@ -124,3 +124,4 @@ interface GregTechRecipe : Entity<GregTechRecipe> {
     val recipeId: String
 }
 
+
